@@ -31,7 +31,7 @@ function BattleArena() {
                 if (chapterCode) {
                     const chapter = await storage.getChapterByCode(chapterCode);
                     if (chapter) {
-                        setChapterName(chapter.name);
+                        setChapterName((chapter as any).name);
                         qData = await storage.getQuestions(chapter.id);
                     } else {
                         alert('Invalid chapter code: ' + chapterCode);

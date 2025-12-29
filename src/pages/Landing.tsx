@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 
 function Landing() {
   const navigate = useNavigate();
-  const { user, loading } = useAuthStore();
+  const { user } = useAuthStore();
   const [isHovered, setIsHovered] = useState(false);
 
   // Redirect to Dashboard if already logged in?
@@ -83,7 +83,7 @@ function Landing() {
                 <div className="text-center">
                   <h3 className="text-lg text-indigo-300 font-bold mb-1">PLAYER READY</h3>
                   <div className="text-2xl text-white font-black animate-pulse">
-                    {user.fullName || user.email}
+                    {user.displayName || user.email}
                   </div>
                 </div>
                 <div className="flex gap-4 w-full">

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Lock, Cpu, ArrowRight, X, Mail, UserPlus, LogIn } from 'lucide-react';
+import { Lock, Cpu, ArrowRight, X, Mail, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage } from '@/lib/storage';
 

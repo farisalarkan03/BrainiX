@@ -216,5 +216,16 @@ export const storage = {
             console.error("Error getting user profile:", error);
             return null;
         }
+    },
+
+    // Get all users (for admin dashboard)
+    getAllUsers: async () => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'users'));
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.error("Error getting all users:", error);
+            return [];
+        }
     }
 };

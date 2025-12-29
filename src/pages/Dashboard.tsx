@@ -53,7 +53,7 @@ export default function PlayerDashboard() {
                             {stats.level}
                         </div>
                         <div>
-                            <h1 className="text-white font-bold text-sm leading-none">{user.fullName || 'Player'}</h1>
+                            <h1 className="text-white font-bold text-sm leading-none">{user.displayName || 'Player'}</h1>
                             <div className="text-xs text-cyan-400 font-mono">{stats.rank}</div>
                         </div>
                     </div>

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3, Settings,
     Server, Swords, QrCode, Plus, Edit, Trash2, Save, X,
-    ArrowLeft, Search, Download, RefreshCw, Trophy, Medal, MapPin
+    ArrowLeft, Download, RefreshCw, Trophy, Medal, MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
