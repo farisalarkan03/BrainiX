@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Chapters: Public READ, Authenticated WRITE
+    match /chapters/{chapterId} {
+      allow read: if true;  // Anyone can read chapters
+      allow write: if request.auth != null;  // Only authenticated users can write
+    }
+    
+    // Questions: Public READ, Authenticated WRITE
+    match /questions/{questionId} {
+      allow read: if true;  // Anyone can read questions
+      allow write: if request.auth != null;  // Only authenticated users can write
+    }
+    
+    // Schools: Public READ, Authenticated WRITE
+    match /schools/{schoolId} {
+      allow read: if true;  // Anyone can read schools (for signup dropdown)
+      allow write: if request.auth != null;  // Only authenticated users can write
+    }
+    
+    // Users: Owner READ/WRITE only
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Game Results: Authenticated users only
+    match /gameResults/{resultId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

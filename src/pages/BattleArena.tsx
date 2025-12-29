@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -7,6 +7,7 @@ import { storage } from '@/lib/storage';
 import { Skull, Trophy, AlertCircle, Home, RotateCcw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useSound } from '@/hooks/useSound';
 
 function BattleArena() {
     const navigate = useNavigate();
@@ -22,6 +23,10 @@ function BattleArena() {
     const [isHit, setIsHit] = useState(false);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost'>('playing');
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
+
+    // Sound System
+    const { playSound, playBgMusic, stopBgMusic } = useSound();
+    const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         const fetchQuestions = async () => {
@@ -54,6 +59,22 @@ function BattleArena() {
         fetchQuestions();
     }, []);
 
+    // Background Music Effect
+    useEffect(() => {
+        if (questions.length > 0 && gameState === 'playing') {
+            // Start background music
+            bgMusicRef.current = playBgMusic('/sounds/battle-bg.mp3', 0.2);
+        }
+
+        return () => {
+            // Cleanup: stop music when component unmounts or game ends
+            if (bgMusicRef.current) {
+                stopBgMusic(bgMusicRef.current);
+                bgMusicRef.current = null;
+            }
+        };
+    }, [questions.length, gameState, playBgMusic, stopBgMusic]);
+
     const [correctAnswers, setCorrectAnswers] = useState(0);
     const [score, setScore] = useState(0); // XP Score
 
@@ -77,6 +98,7 @@ function BattleArena() {
 
         if (isCorrect) {
             // Correct Answer
+            playSound('/sounds/correct.mp3', 0.6);
             setIsHit(true);
             setCorrectAnswers(prev => prev + 1);
             setScore(prev => prev + 50); // 50 XP per correct answer
@@ -85,6 +107,9 @@ function BattleArena() {
             setBossHp(newHp);
 
             setTimeout(() => setIsHit(false), 500);
+        } else {
+            // Wrong Answer
+            playSound('/sounds/wrong.mp3', 0.5);
         }
 
         // Delay for animation before next question or end game
