@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 
 interface UseSoundReturn {
     playSound: (soundPath: string, volume?: number) => void;
