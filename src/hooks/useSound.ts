@@ -7,8 +7,6 @@ interface UseSoundReturn {
 }
 
 export const useSound = (): UseSoundReturn => {
-    const audioContext = useRef<AudioContext | null>(null);
-
     const playSound = useCallback((soundPath: string, volume: number = 0.5) => {
         try {
             const audio = new Audio(soundPath);
