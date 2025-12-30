@@ -17,7 +17,7 @@ import {
 } from 'firebase/auth';
 
 // Helper to generate unique chapter codes
-const generateChapterCode = (chapterName: string) => {
+export const generateChapterCode = (chapterName: string) => {
     const prefix = chapterName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
     const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
     return `${prefix}-${randomPart}`;
@@ -39,7 +39,9 @@ export const storage = {
         try {
             const newId = chapter.id || 'chapter_' + Date.now();
             const code = chapter.code || generateChapterCode(chapter.name);
-            const chapterData = { ...chapter, id: newId, code };
+            // Default accessLevel to 'public' for backward compatibility
+            const accessLevel = chapter.accessLevel || 'public';
+            const chapterData = { ...chapter, id: newId, code, accessLevel };
 
             await setDoc(doc(db, 'chapters', newId), chapterData);
             return chapterData;
@@ -74,6 +76,17 @@ export const storage = {
         } catch (error) {
             console.error("Error getting chapter by code:", error);
             return null;
+        }
+    },
+
+    getPublicChapters: async () => {
+        try {
+            const q = query(collection(db, 'chapters'), where("accessLevel", "==", "public"));
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.error("Error getting public chapters:", error);
+            return [];
         }
     },
 

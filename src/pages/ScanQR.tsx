@@ -32,13 +32,25 @@ function ScanQR() {
             // Validate if it's a valid chapter code
             const chapter = await storage.getChapterByCode(codeToTest);
 
-            if (chapter) {
-                navigate(`/battle?code=${codeToTest}`);
-            } else {
+            if (!chapter) {
                 alert('Invalid chapter code. Please scan a valid QR or enter a correct access key.');
                 setScanned(false);
                 setResult(null);
+                return;
             }
+
+            // Check access level
+            const accessLevel = (chapter as any).accessLevel || 'public';
+
+            if (accessLevel === 'draft') {
+                alert('⚠️ Chapter ini belum tersedia!\n\nChapter masih dalam status draft dan belum dapat diakses. Silakan hubungi pengajar atau coba chapter lain.');
+                setScanned(false);
+                setResult(null);
+                return;
+            }
+
+            // For public and private chapters, allow access
+            navigate(`/battle?code=${codeToTest}`);
         } catch (error) {
             console.error(error);
             alert("Error checking code");

@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { HealthBar } from '@/components/game/HealthBar';
 import { storage } from '@/lib/storage';
-import { Skull, Trophy, AlertCircle, Home, RotateCcw } from 'lucide-react';
+import { Skull, Trophy, AlertCircle, Home, RotateCcw, Zap } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useSound } from '@/hooks/useSound';
+import { useAuthStore } from '@/store/authStore';
 
 function BattleArena() {
     const navigate = useNavigate();
+    const { user } = useAuthStore();
     const [searchParams] = useSearchParams();
     const chapterCode = searchParams.get('code');
 
@@ -19,10 +21,11 @@ function BattleArena() {
     const [chapterName, setChapterName] = useState('Unknown Chapter');
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [bossHp, setBossHp] = useState(100);
+    const [bossHp, setBossHp] = useState(0);
     const [isHit, setIsHit] = useState(false);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost'>('playing');
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
+    const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
     // Sound System
     const { playSound, playBgMusic, stopBgMusic } = useSound();
@@ -35,14 +38,22 @@ function BattleArena() {
 
                 if (chapterCode) {
                     const chapter = await storage.getChapterByCode(chapterCode);
-                    if (chapter) {
-                        setChapterName((chapter as any).name);
-                        qData = await storage.getQuestions(chapter.id);
-                    } else {
+                    if (!chapter) {
                         alert('Invalid chapter code: ' + chapterCode);
                         navigate('/');
                         return;
                     }
+
+                    // Check access level
+                    const accessLevel = (chapter as any).accessLevel || 'public';
+                    if (accessLevel === 'draft') {
+                        alert('⚠️ Chapter ini belum tersedia!\n\nChapter masih dalam status draft dan belum dapat diakses. Silakan hubungi pengajar atau coba chapter lain.');
+                        navigate('/');
+                        return;
+                    }
+
+                    setChapterName((chapter as any).name);
+                    qData = await storage.getQuestions(chapter.id);
                 } else {
                     // Fallback: load all questions
                     qData = await storage.getQuestions();
@@ -100,16 +111,22 @@ function BattleArena() {
             // Correct Answer
             playSound('/sounds/correct.mp3', 0.6);
             setIsHit(true);
+            setFeedback('correct');
             setCorrectAnswers(prev => prev + 1);
             setScore(prev => prev + 50); // 50 XP per correct answer
 
-            const newHp = Math.max(0, bossHp - damagePerHit);
+            const newHp = Math.min(100, bossHp + damagePerHit);
             setBossHp(newHp);
 
-            setTimeout(() => setIsHit(false), 500);
+            setTimeout(() => {
+                setIsHit(false);
+                setFeedback(null);
+            }, 600);
         } else {
             // Wrong Answer
             playSound('/sounds/wrong.mp3', 0.5);
+            setFeedback('wrong');
+            setTimeout(() => setFeedback(null), 600);
         }
 
         // Delay for animation before next question or end game
@@ -160,7 +177,7 @@ function BattleArena() {
 
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <Card glow className="max-w-md w-full text-center p-8 border-2 border-indigo-500/50">
+                <Card glow className={cn("max-w-md w-full text-center p-8 border-2", gameState === 'won' ? "border-indigo-500/50" : "border-red-500/50")}>
                     <motion.div
                         initial={{ scale: 0.5, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -178,8 +195,16 @@ function BattleArena() {
                     </motion.div>
 
                     <h1 className="text-4xl font-display font-black mb-2 text-white">
-                        {gameState === 'won' ? 'VICTORY!' : 'DEFEATAED'}
+                        {gameState === 'won' ? 'VICTORY!' : 'DEFEATED'}
                     </h1>
+
+                    {!user && gameState === 'won' && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4 animate-pulse">
+                            <p className="text-yellow-400 text-xs font-bold flex items-center justify-center gap-2">
+                                <AlertCircle size={14} /> STATUS: ANONYMOUS
+                            </p>
+                        </div>
+                    )}
 
                     <div className="my-6 space-y-2">
                         <div className="text-slate-400 flex justify-between px-8">
@@ -197,19 +222,39 @@ function BattleArena() {
                         )}
                     </div>
 
-                    <p className="text-slate-400 mb-8 text-sm">
+                    <p className="text-slate-400 mb-8 text-sm leading-relaxed px-4">
                         {gameState === 'won'
-                            ? 'You dealt sufficient damage to destroy the boss.'
-                            : `You only dealt ${accuracyPercent}% damage. You need 80% to win.`}
+                            ? (!user
+                                ? 'Misi berhasil! Tapi tunggu, pencapaianmu belum bisa disimpan ke Hall of Fame karena kamu belum login.'
+                                : 'Luar biasa! Kamu berhasil mengumpulkan energi yang cukup untuk mengalahkan boss.')
+                            : `Energi belum cukup (hanya ${accuracyPercent}%). Kamu butuh setidaknya 80% untuk menang.`}
                     </p>
 
-                    <div className="flex gap-4 justify-center">
-                        <Button variant="secondary" onClick={() => navigate('/dashboard')}>
-                            <Home className="w-4 h-4 mr-2" /> HQ
-                        </Button>
-                        <Button onClick={() => window.location.reload()}>
-                            <RotateCcw className="w-4 h-4 mr-2" /> Retry
-                        </Button>
+                    <div className="flex flex-col gap-4">
+                        {!user && gameState === 'won' ? (
+                            <>
+                                <Button className="w-full neon-shadow font-black h-12" onClick={() => navigate('/signup')}>
+                                    <Zap className="w-5 h-5 mr-2" /> DAFTAR SEKARANG
+                                </Button>
+                                <div className="flex gap-2">
+                                    <Button variant="secondary" className="flex-1" onClick={() => navigate('/login')}>
+                                        Masuk
+                                    </Button>
+                                    <Button variant="ghost" className="text-slate-500 text-xs" onClick={() => navigate('/')}>
+                                        Nanti Saja
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex gap-4 justify-center">
+                                <Button variant="secondary" onClick={() => navigate(user ? '/dashboard' : '/')}>
+                                    <Home className="w-4 h-4 mr-2" /> {user ? 'HQ' : 'Home'}
+                                </Button>
+                                <Button onClick={() => window.location.reload()}>
+                                    <RotateCcw className="w-4 h-4 mr-2" /> Retry
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>
@@ -220,11 +265,16 @@ function BattleArena() {
         <div className="min-h-screen bg-slate-950 flex flex-col p-4 overflow-hidden relative">
 
             {/* Background Ambience */}
-            <div className={cn("absolute inset-0 pointer-events-none transition-colors duration-300", isHit ? "bg-red-900/20" : "")} />
+            <div className={cn(
+                "absolute inset-0 pointer-events-none transition-colors duration-300",
+                feedback === 'correct' ? "bg-green-900/40" :
+                    feedback === 'wrong' ? "bg-red-900/60" :
+                        isHit ? "bg-white/10" : ""
+            )} />
 
             {/* Boss Area */}
             <div className="flex-1 flex flex-col items-center justify-center relative py-8">
-                <HealthBar current={bossHp} max={maxBossHp} label={`FINAL BOSS - ${chapterName.toUpperCase()}`} />
+                <HealthBar current={bossHp} max={maxBossHp} label={`PROGRESS - ${chapterName.toUpperCase()}`} />
 
                 <motion.div
                     animate={isHit ? {

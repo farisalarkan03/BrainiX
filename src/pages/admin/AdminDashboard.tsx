@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { storage } from '@/lib/storage';
+import { storage, generateChapterCode } from '@/lib/storage';
 import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3, Settings,
@@ -147,7 +147,9 @@ function CMSModule() {
     const [chapterForm, setChapterForm] = useState({
         name: '',
         description: '',
-        difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard'
+        difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+        accessLevel: 'public' as 'public' | 'private' | 'draft',
+        code: ''
     });
 
     // Question Form State
@@ -179,7 +181,7 @@ function CMSModule() {
             await storage.saveChapter(chapterData);
             setIsEditingChapter(null);
             setRefresh(p => p + 1);
-            setChapterForm({ name: '', description: '', difficulty: 'Medium' });
+            setChapterForm({ name: '', description: '', difficulty: 'Medium', accessLevel: 'public', code: '' });
         } catch (e: any) {
             alert("Error saving chapter: " + e.message);
         }
@@ -225,7 +227,9 @@ function CMSModule() {
         setChapterForm({
             name: chapter.name,
             description: chapter.description,
-            difficulty: chapter.difficulty
+            difficulty: chapter.difficulty,
+            accessLevel: chapter.accessLevel || 'public',
+            code: chapter.code || ''
         });
     };
 
@@ -244,6 +248,19 @@ function CMSModule() {
             case 'Easy': return 'text-green-400 bg-green-950/30';
             case 'Hard': return 'text-red-400 bg-red-950/30';
             default: return 'text-yellow-400 bg-yellow-950/30';
+        }
+    };
+
+    const getAccessLevelInfo = (accessLevel: string) => {
+        switch (accessLevel) {
+            case 'public':
+                return { label: '🌍 Public', color: 'text-green-400 bg-green-950/30 border-green-500/30', tooltip: 'Dapat diakses semua orang' };
+            case 'private':
+                return { label: '🔒 Private', color: 'text-orange-400 bg-orange-950/30 border-orange-500/30', tooltip: 'Hanya via QR/Code' };
+            case 'draft':
+                return { label: '📝 Draft', color: 'text-slate-400 bg-slate-900/50 border-slate-700', tooltip: 'Belum dapat diakses' };
+            default:
+                return { label: '🌍 Public', color: 'text-green-400 bg-green-950/30 border-green-500/30', tooltip: 'Dapat diakses semua orang' };
         }
     };
 
@@ -282,7 +299,7 @@ function CMSModule() {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-bold text-white">Chapters</h3>
-                                <Button onClick={() => { setIsEditingChapter('new'); setChapterForm({ name: '', description: '', difficulty: 'Medium' }); }} className="neon-shadow">
+                                <Button onClick={() => { setIsEditingChapter('new'); setChapterForm({ name: '', description: '', difficulty: 'Medium', accessLevel: 'public', code: '' }); }} className="neon-shadow">
                                     <Plus className="w-4 h-4 mr-2" /> Create Chapter
                                 </Button>
                             </div>
@@ -297,7 +314,27 @@ function CMSModule() {
                                         <button onClick={() => setIsEditingChapter(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
                                     </div>
                                     <div className="space-y-4">
-                                        <Input label="Chapter Name" value={chapterForm.name} onChange={e => setChapterForm({ ...chapterForm, name: e.target.value })} placeholder="e.g. Algebra Basics" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input label="Chapter Name" value={chapterForm.name} onChange={e => setChapterForm({ ...chapterForm, name: e.target.value })} placeholder="e.g. Algebra Basics" />
+                                            <div className="relative">
+                                                <Input
+                                                    label="Access Code (Auto-generated)"
+                                                    value={chapterForm.code}
+                                                    placeholder="Will be generated on save"
+                                                    readOnly
+                                                    className="bg-slate-900/50"
+                                                />
+                                                {chapterForm.name && (
+                                                    <button
+                                                        onClick={() => setChapterForm({ ...chapterForm, code: generateChapterCode(chapterForm.name) })}
+                                                        className="absolute right-2 top-8 p-2 text-cyan-400 hover:text-cyan-300 transition-colors"
+                                                        title="Regenerate Code"
+                                                    >
+                                                        <RefreshCw size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                         <Input label="Description" value={chapterForm.description} onChange={e => setChapterForm({ ...chapterForm, description: e.target.value })} placeholder="Short description for students" />
                                         <div>
                                             <label className="block text-sm font-medium text-slate-400 mb-2">Difficulty Level</label>
@@ -318,6 +355,39 @@ function CMSModule() {
                                                 ))}
                                             </div>
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-400 mb-2">Access Level</label>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { value: 'public', label: '🌍 Public', tooltip: 'Dapat diakses semua orang' },
+                                                    { value: 'private', label: '🔒 Private', tooltip: 'Hanya via QR/Code' },
+                                                    { value: 'draft', label: '📝 Draft', tooltip: 'Belum dapat diakses' }
+                                                ].map(level => (
+                                                    <button
+                                                        key={level.value}
+                                                        onClick={() => setChapterForm({ ...chapterForm, accessLevel: level.value as any })}
+                                                        title={level.tooltip}
+                                                        className={cn(
+                                                            "px-4 py-2 rounded-lg font-bold text-sm transition-all border",
+                                                            chapterForm.accessLevel === level.value
+                                                                ? level.value === 'public'
+                                                                    ? "bg-green-600 text-white border-green-500"
+                                                                    : level.value === 'private'
+                                                                        ? "bg-orange-600 text-white border-orange-500"
+                                                                        : "bg-slate-700 text-white border-slate-600"
+                                                                : "bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700"
+                                                        )}
+                                                    >
+                                                        {level.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-2">
+                                                {chapterForm.accessLevel === 'public' && '✓ Chapter akan muncul di halaman utama'}
+                                                {chapterForm.accessLevel === 'private' && '✓ Hanya dapat diakses menggunakan QR code atau kode akses'}
+                                                {chapterForm.accessLevel === 'draft' && '✓ Chapter disimpan tapi belum dapat diakses'}
+                                            </p>
+                                        </div>
                                         <div className="flex justify-end pt-4">
                                             <Button onClick={handleSaveChapter}><Save className="w-4 h-4 mr-2" /> Save Chapter</Button>
                                         </div>
@@ -336,9 +406,17 @@ function CMSModule() {
                                         <Card key={chapter.id} className="p-6 hover:bg-slate-800/50 transition-colors group border-l-4 border-l-indigo-500 cursor-pointer" onClick={() => setSelectedChapter(chapter)}>
                                             <div className="flex justify-between items-start mb-3">
                                                 <h4 className="text-lg font-bold text-white group-hover:text-cyan-400 transition-colors">{chapter.name}</h4>
-                                                <span className={cn("text-xs font-bold px-2 py-1 rounded", getDifficultyColor(chapter.difficulty))}>
-                                                    {chapter.difficulty}
-                                                </span>
+                                                <div className="flex gap-2">
+                                                    <span className={cn("text-xs font-bold px-2 py-1 rounded", getDifficultyColor(chapter.difficulty))}>
+                                                        {chapter.difficulty}
+                                                    </span>
+                                                    <span
+                                                        className={cn("text-xs font-bold px-2 py-1 rounded border", getAccessLevelInfo(chapter.accessLevel || 'public').color)}
+                                                        title={getAccessLevelInfo(chapter.accessLevel || 'public').tooltip}
+                                                    >
+                                                        {getAccessLevelInfo(chapter.accessLevel || 'public').label}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <p className="text-sm text-slate-400 mb-4">{chapter.description || 'No description'}</p>
                                             <div className="flex items-center justify-between text-xs">
