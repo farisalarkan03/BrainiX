@@ -1,4 +1,4 @@
-import { db, auth } from './firebase';
+import { db, auth, storage_bucket } from './firebase';
 import {
     collection,
     getDocs,
@@ -9,6 +9,10 @@ import {
     where,
     getDoc
 } from 'firebase/firestore';
+import {
+    ref,
+    deleteObject
+} from 'firebase/storage';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -239,6 +243,74 @@ export const storage = {
         } catch (error) {
             console.error("Error getting all users:", error);
             return [];
+        }
+    },
+
+    // --- CHEATSHEETS ---
+    getCheatSheets: async () => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'cheatsheets'));
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.error("Error getting cheatsheets:", error);
+            return [];
+        }
+    },
+
+    getCheatSheetByChapter: async (chapterId: string) => {
+        try {
+            const q = query(collection(db, 'cheatsheets'), where("chapterId", "==", chapterId));
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.empty) return null;
+            return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+        } catch (error) {
+            console.error("Error getting cheatsheet by chapter:", error);
+            return null;
+        }
+    },
+
+    saveCheatSheet: async (cheatsheet: any) => {
+        try {
+            const newId = cheatsheet.id || 'cs_' + Date.now();
+            const csData = { ...cheatsheet, id: newId, updatedAt: new Date().toISOString() };
+            await setDoc(doc(db, 'cheatsheets', newId), csData);
+            return csData;
+        } catch (error) {
+            console.error("Error saving cheatsheet:", error);
+            throw error;
+        }
+    },
+
+    deleteCheatSheet: async (id: string, imageUrl?: string) => {
+        try {
+            await deleteDoc(doc(db, 'cheatsheets', id));
+            // Only attempt storage deletion if it's a real Firebase Storage URL (not Base64)
+            if (imageUrl && imageUrl.startsWith('http') && imageUrl.includes('firebasestorage.googleapis.com')) {
+                const imageRef = ref(storage_bucket, imageUrl);
+                await deleteObject(imageRef).catch(e => console.warn("Failed to delete image file:", e));
+            }
+        } catch (error) {
+            console.error("Error deleting cheatsheet:", error);
+            throw error;
+        }
+    },
+
+    uploadImage: async (file: File) => {
+        try {
+            return new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve(reader.result as string);
+                };
+                reader.onerror = (error) => {
+                    console.error("Base64 conversion error:", error);
+                    reject(error);
+                };
+                reader.readAsDataURL(file);
+            });
+        } catch (error) {
+            console.error("Error in uploadImage (Base64):", error);
+            throw error;
         }
     }
 };

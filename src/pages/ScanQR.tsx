@@ -50,7 +50,7 @@ function ScanQR() {
             }
 
             // For public and private chapters, allow access
-            navigate(`/battle?code=${codeToTest}`);
+            navigate(`/briefing?code=${codeToTest}`);
         } catch (error) {
             console.error(error);
             alert("Error checking code");

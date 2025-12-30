@@ -10,6 +10,7 @@ import DeveloperLogin from '@/pages/auth/DeveloperLogin';
 import Dashboard from '@/pages/Dashboard';
 import ScanQR from '@/pages/ScanQR';
 import BattleArena from '@/pages/BattleArena';
+import Briefing from '@/pages/Briefing';
 import Leaderboard from '@/pages/Leaderboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 
@@ -31,6 +32,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/scan" element={<ScanQR />} />
+                <Route path="/briefing" element={<Briefing />} />
                 <Route path="/battle" element={<BattleArena />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
 

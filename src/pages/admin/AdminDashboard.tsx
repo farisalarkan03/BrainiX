@@ -7,7 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3, Settings,
     Server, Swords, QrCode, Plus, Edit, Trash2, Save, X,
-    ArrowLeft, Download, RefreshCw, Trophy, Medal, MapPin
+    ArrowLeft, Download, RefreshCw, Trophy, Medal, MapPin,
+    Upload, Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -160,10 +161,20 @@ function CMSModule() {
         damage: 25
     });
 
+    // CheatSheet State
+    const [cheatsheets, setCheatSheets] = useState<any[]>([]);
+    const [isEditingCS, setIsEditingCS] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [csForm, setCsForm] = useState({
+        chapterId: '',
+        imageUrl: '',
+        title: ''
+    });
 
 
     useEffect(() => {
         storage.getChapters().then(setChapters);
+        storage.getCheatSheets().then(setCheatSheets);
     }, [refresh]);
 
     useEffect(() => {
@@ -261,6 +272,119 @@ function CMSModule() {
                 return { label: '📝 Draft', color: 'text-slate-400 bg-slate-900/50 border-slate-700', tooltip: 'Belum dapat diakses' };
             default:
                 return { label: '🌍 Public', color: 'text-green-400 bg-green-950/30 border-green-500/30', tooltip: 'Dapat diakses semua orang' };
+        }
+    };
+
+    const compressImage = (file: File): Promise<File> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onerror = (err) => {
+                    console.error("Image loading error:", err);
+                    resolve(file); // Fallback to original on error
+                };
+                img.onload = () => {
+                    console.log("Image loaded for compression, dimensions:", img.width, "x", img.height);
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1200;
+                    const MAX_HEIGHT = 1200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const newFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+                            console.log("Compression done. Original size:", (file.size / 1024).toFixed(2), "KB, New size:", (newFile.size / 1024).toFixed(2), "KB");
+                            resolve(newFile);
+                        } else {
+                            console.warn("Canvas toBlob failed, using original file");
+                            resolve(file);
+                        }
+                    }, 'image/jpeg', 0.8); // 80% quality
+                };
+            };
+            reader.onerror = (err) => {
+                console.error("FileReader error:", err);
+                resolve(file);
+            };
+        });
+    };
+
+    const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        console.log("Starting upload process for:", file.name, "Type:", file.type);
+        setIsUploading(true);
+        try {
+            // Compress image if it's an image
+            let fileToUpload = file;
+            if (file.type.startsWith('image/')) {
+                console.log("Compressing image...");
+                fileToUpload = await compressImage(file);
+            }
+
+            console.log("Converting to Base64...");
+            const url = await storage.uploadImage(fileToUpload);
+            console.log("Conversion success!");
+            setCsForm({ ...csForm, imageUrl: url });
+        } catch (error: any) {
+            console.error("Upload error caught in UI:", error);
+            alert("Upload failed: " + error.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleSaveCS = async () => {
+        if (!csForm.chapterId || !csForm.imageUrl) {
+            return alert("Please select a chapter and upload an image");
+        }
+        try {
+            const data = {
+                id: (isEditingCS && isEditingCS !== 'new') ? isEditingCS : undefined,
+                ...csForm
+            };
+            await storage.saveCheatSheet(data);
+            setIsEditingCS(null);
+            setCsForm({ chapterId: '', imageUrl: '', title: '' });
+            setRefresh(p => p + 1);
+        } catch (error: any) {
+            alert("Error saving cheatsheet: " + error.message);
+        }
+    };
+
+    const handleDeleteCS = async (id: string, imageUrl: string) => {
+        if (confirm("Delete this cheatsheet?")) {
+            try {
+                await storage.deleteCheatSheet(id, imageUrl);
+                setRefresh(p => p + 1);
+            } catch (error: any) {
+                alert("Error deleting: " + error.message);
+            }
         }
     };
 
@@ -513,10 +637,104 @@ function CMSModule() {
             )}
 
             {activeTab === 'cheatsheets' && (
-                <div className="text-center py-20 bg-slate-900/50 rounded-lg border border-dashed border-slate-700">
-                    <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <h3 className="text-lg text-slate-400 font-bold">Cheat Sheet Editor</h3>
-                    <p className="text-slate-500">Feature coming soon. Will support Markdown & Infographics.</p>
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-white">Cheat Sheet Management</h3>
+                        <Button onClick={() => { setIsEditingCS('new'); setCsForm({ chapterId: '', imageUrl: '', title: '' }); }} className="neon-shadow">
+                            <Plus className="w-4 h-4 mr-2" /> Add Cheat Sheet
+                        </Button>
+                    </div>
+
+                    {isEditingCS && (
+                        <Card glow className="border-cyan-500/50 mb-6">
+                            <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                                <h2 className="text-lg font-bold text-cyan-400">
+                                    {isEditingCS === 'new' ? 'New Cheat Sheet' : 'Edit Cheat Sheet'}
+                                </h2>
+                                <button onClick={() => setIsEditingCS(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-400 mb-2">Target Chapter</label>
+                                        <select
+                                            value={csForm.chapterId}
+                                            onChange={e => setCsForm({ ...csForm, chapterId: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
+                                        >
+                                            <option value="">Select Chapter</option>
+                                            {chapters.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <Input label="Short Title (Internal)" value={csForm.title} onChange={e => setCsForm({ ...csForm, title: e.target.value })} placeholder="e.g. Infografis Aljabar" />
+                                </div>
+
+                                <div className="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-950/50">
+                                    {csForm.imageUrl ? (
+                                        <div className="space-y-4">
+                                            <img src={csForm.imageUrl} alt="Cheat Sheet" className="max-h-60 mx-auto rounded-lg shadow-lg" />
+                                            <div className="flex justify-center gap-2">
+                                                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={() => setCsForm({ ...csForm, imageUrl: '' })}>
+                                                    <Trash2 size={14} className="mr-1" /> Remove Image
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto text-slate-500">
+                                                <ImageIcon size={32} />
+                                            </div>
+                                            <div>
+                                                <p className="text-white font-bold">Upload infographic/image</p>
+                                                <p className="text-slate-500 text-sm">PNG, JPG or WebP supported</p>
+                                            </div>
+                                            <label className="inline-block cursor-pointer">
+                                                <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} disabled={isUploading} />
+                                                <Button variant="secondary" disabled={isUploading} className="pointer-events-none">
+                                                    {isUploading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                                                    {isUploading ? 'Processing...' : 'Choose Image'}
+                                                </Button>
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <Button onClick={handleSaveCS} disabled={isUploading} className="neon-shadow">
+                                        <Save className="w-4 h-4 mr-2" /> Save Cheat Sheet
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {cheatsheets.map(cs => {
+                            const chapter = chapters.find(c => c.id === cs.chapterId);
+                            return (
+                                <Card key={cs.id} className="p-0 overflow-hidden group">
+                                    <div className="h-40 bg-slate-950 flex items-center justify-center overflow-hidden">
+                                        <img src={cs.imageUrl} alt={cs.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="p-4 bg-slate-900">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="font-bold text-white line-clamp-1">{cs.title || 'Untitled'}</h4>
+                                            <Button size="sm" variant="danger" onClick={() => handleDeleteCS(cs.id, cs.imageUrl)}>
+                                                <Trash2 size={12} />
+                                            </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <BookOpen size={12} />
+                                            <span>Chapter: {chapter?.name || 'Unknown'}</span>
+                                        </div>
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                        {cheatsheets.length === 0 && <p className="text-slate-500 text-center py-8 col-span-3">No cheat sheets found.</p>}
+                    </div>
                 </div>
             )}
 

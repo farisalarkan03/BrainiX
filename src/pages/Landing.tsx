@@ -148,8 +148,8 @@ function Landing() {
                     glow
                     className="bg-slate-900/40 hover:bg-slate-900/60 transition-all group cursor-pointer border-l-4 border-l-cyan-400 relative overflow-hidden"
                     onClick={() => {
-                      // Navigate to battle arena with chapter code
-                      navigate(`/battle?code=${chapter.code}`);
+                      // Navigate to briefing first
+                      navigate(`/briefing?code=${chapter.code}`);
                     }}
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl" />

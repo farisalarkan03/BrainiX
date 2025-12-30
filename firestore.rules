@@ -19,6 +19,12 @@ service cloud.firestore {
       allow read: if true;  // Anyone can read schools (for signup dropdown)
       allow write: if request.auth != null;  // Only authenticated users can write
     }
+
+    // CheatSheets: Public READ, Authenticated WRITE
+    match /cheatsheets/{csId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
     
     // Users: Owner READ/WRITE only
     match /users/{userId} {
